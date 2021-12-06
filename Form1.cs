@@ -6,6 +6,7 @@ namespace WinFormsViewYUV
         public const int CifHeight = 288;
         public const int YSize = CifWidth * CifHeight;
         public const int UVSize = (CifWidth / 2) * (CifHeight / 2);
+        public const int Interval = 33;
 
         private byte[] _y = new byte[YSize];
         private byte[] _u = new byte[UVSize];
@@ -14,9 +15,15 @@ namespace WinFormsViewYUV
         private Bitmap _bmp = new(CifWidth, CifHeight, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
         private Rectangle _rect = new(0, 0, CifWidth, CifHeight);
 
+        private FileStream? _fs = null;
+        private System.Windows.Forms.Timer _myTimer = new();
+
         public Form1()
         {
             InitializeComponent();
+            pictureBox1.Image = _bmp;
+            _myTimer.Tick += new EventHandler(DrawImage);
+            _myTimer.Interval = Interval;
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -33,20 +40,25 @@ namespace WinFormsViewYUV
 
             if (ofd.ShowDialog() == DialogResult.OK)
             {
+                if (_fs != null)
+                {
+                    _fs.Dispose();
+                    _fs = null;
+                }
                 textBox1.Text = ofd.FileName;
                 button2.Enabled = true;
             }
         }
 
-        private int ReadYUV(FileStream fs)
+        private int ReadYUV()
         {
-            if (fs != null)
+            if (_fs != null)
             {
-                int size = fs.Read(_y, 0, YSize);
+                int size = _fs.Read(_y, 0, YSize);
                 if (size != YSize) return -1;
-                size = fs.Read(_u, 0, UVSize);
+                size = _fs.Read(_u, 0, UVSize);
                 if (size != UVSize) return -1;
-                size = fs.Read(_v, 0, UVSize);
+                size = _fs.Read(_v, 0, UVSize);
                 if (size != UVSize) return -1;
             }
             else return -1;
@@ -90,18 +102,21 @@ namespace WinFormsViewYUV
             return;
         }
 
-        private void DrawImage()
+        private void DrawImage(Object? myObject, EventArgs myEventArgs)
         {
-            using (var fs = File.OpenRead(textBox1.Text))
+            if (ReadYUV() == 0)
             {
-                while (0 == ReadYUV(fs))
-                {
-                    var bmData = _bmp.LockBits(_rect, System.Drawing.Imaging.ImageLockMode.WriteOnly, _bmp.PixelFormat);
-                    ConvertYUV2RGB(bmData.Scan0, bmData.Stride);
-                    _bmp.UnlockBits(bmData);
-                    pictureBox1.Invalidate();
-                    pictureBox1.Update();
-                }
+                var bmData = _bmp.LockBits(_rect, System.Drawing.Imaging.ImageLockMode.WriteOnly, _bmp.PixelFormat);
+                ConvertYUV2RGB(bmData.Scan0, bmData.Stride);
+                _bmp.UnlockBits(bmData);
+                pictureBox1.Invalidate();
+                pictureBox1.Update();
+            }
+            else
+            {
+                _myTimer.Stop();
+                button1.Enabled = true;
+                button2.Enabled = true;
             }
         }
 
@@ -109,10 +124,20 @@ namespace WinFormsViewYUV
         {
             button1.Enabled = false;
             button2.Enabled = false;
-            pictureBox1.Image = _bmp;
-            DrawImage();
-            button2.Enabled = true;
-            button1.Enabled = true;
+            if (_fs != null)
+            {
+                _fs.Dispose();
+            }
+            _fs = File.OpenRead(textBox1.Text);
+            _myTimer.Start();
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (_fs != null)
+            {
+                _fs.Dispose();
+            }
         }
     }
 }
