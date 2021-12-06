@@ -107,8 +107,12 @@ namespace WinFormsViewYUV
 
         private void button2_Click(object sender, EventArgs e)
         {
+            button1.Enabled = false;
+            button2.Enabled = false;
             pictureBox1.Image = _bmp;
             DrawImage();
+            button2.Enabled = true;
+            button1.Enabled = true;
         }
     }
 }
